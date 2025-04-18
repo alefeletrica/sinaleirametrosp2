@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sinaleira BLOCO A - Metrô-SP</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root {
+      --primary: #007bff;
+      --primary-dark: #0056b3;
+      --bg: #f2f2f2;
+      --text: #222;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      padding: 20px;
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    .img-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .img-container img {
+      width: 120px;
+      height: auto;
+    }
+
+    h1 {
+      font-size: 1.6em;
+      margin: 10px 0 20px;
+      color: var(--text);
+    }
+
+    button {
+      width: 90%;
+      max-width: 300px;
+      padding: 15px;
+      margin: 10px auto;
+      font-size: 1.2em;
+      color: white;
+      background-color: var(--primary);
+      border: none;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button:active {
+      background-color: var(--primary-dark);
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.1em;
+      color: var(--text);
+    }
+
+    #trem {
+      margin: 25px auto;
+      width: 90%;
+      max-width: 300px;
+      display: none;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .blink {
+      animation: blink-animation 1s steps(2, start) infinite;
+    }
+
+    @keyframes blink-animation {
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="img-container">
+      <img src="metro.jpg" alt="Símbolo Metrô-SP">
+    </div>
+
+    <h1>Sinaleira BLOCO A - Metrô-SP</h1>
+
+    <button onclick="sendCommand('onsinaleirametro123')">🔴 Ligar SINALEIRA</button>
+    <button onclick="sendCommand('offsinaleirametro123')">⚫ Desligar SINALEIRA</button>
+
+    <div id="status">🔄 Aguardando conexão com o broker...</div>
+
+    <img id="trem" src="trementrando.webp" alt="Trem entrando">
+  </div>
+
+  <script>
+    const options = {
+      clean: true,
+      connectTimeout: 4000,
+      reconnectPeriod: 4000
+    };
+
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", options);
+    const topic = "controle/sinaleirametro";
+    let ignoreFirstMessage = true;
+
+    client.on("connect", () => {
+      console.log("✅ Conectado ao broker EMQX");
+      document.getElementById("status").textContent = "✅ Conectado! Aguardando comandos...";
+      client.subscribe(topic);
+    });
+
+    client.on("error", (err) => {
+      console.error("❌ Erro na conexão:", err);
+      document.getElementById("status").textContent = "❌ Erro ao conectar: " + err.message;
+    });
+
+    client.on("message", (receivedTopic, message) => {
+      if (receivedTopic === topic) {
+        const payload = message.toString().trim().toLowerCase();
+        console.log("📥 Mensagem recebida:", payload);
+
+        if (payload === "onsinaleirametro123" || payload === "offsinaleirametro123") {
+          const simbolo = payload.includes("on") ? "🔴" : "⚫";
+          const texto = payload.includes("on") ? "LIGADA" : "DESLIGADA";
+          document.getElementById("status").textContent = `${simbolo} Sinaleira ${texto}`;
+          toggleTrem(payload.includes("on"));
+        }
+      }
+    });
+
+    function sendCommand(cmd) {
+      if (client.connected) {
+        client.publish(topic, cmd);
+      } else {
+        document.getElementById("status").textContent = "⚠️ Broker desconectado!";
+        toggleTrem(false);
+      }
+    }
+
+    function toggleTrem(show) {
+      const trem = document.getElementById("trem");
+      if (show) {
+        trem.style.display = "block";
+        trem.classList.add("blink");
+      } else {
+        trem.style.display = "none";
+        trem.classList.remove("blink");
+      }
+    }
+  </script>
+</body>
+</html>
